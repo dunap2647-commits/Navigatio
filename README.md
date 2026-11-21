@@ -45,7 +45,7 @@ navigatio/
 
 ## 📱 Requirements
 
-* **OS:** iOS 12.0 – 12.5.7
+* **OS:** iOS 12.0 – 12.5.8
 * **Jailbreak:** Rootful (Chimera, unc0ver, checkra1n)
 * **Architecture:** `arm64` (iPhone 5s, 6, 6 Plus, 6s, 6s Plus, SE 1st Gen, 7, 7 Plus, 8, 8 Plus, X, iPad Air 1/2, iPad mini 2/3/4)
 
