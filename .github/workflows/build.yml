@@ -56,12 +56,7 @@ jobs:
           for p in daemon/entitlements.plist app/entitlements.plist app/Info.plist \
                    layout/Library/LaunchDaemons/com.navigatio.daemon.plist; do
             echo "-> $p"
-            python3 - "$p" <<'PY'
-import plistlib, sys
-with open(sys.argv[1], 'rb') as f:
-    plistlib.load(f)
-print("ok")
-PY
+            python3 -c "import plistlib, sys; plistlib.load(open(sys.argv[1], 'rb')); print('ok')" "$p"
           done
 
       - name: Build
@@ -85,4 +80,3 @@ PY
           path: |
             .theos/_/DEBIAN
             **/*.log
-          if-no-files-found: ignore
