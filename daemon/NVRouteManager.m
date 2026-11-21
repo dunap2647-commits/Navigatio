@@ -5,14 +5,20 @@
 
 #import "NVRouteManager.h"
 #import <sys/ioctl.h>
+#import <sys/kern_control.h> // Исправлено: заменено net/if_utun.h
 #import <net/if.h>
-#import <net/if_utun.h>
-#import <net/if_dl.h>
 #import <netinet/in.h>
-#import <arpa/inet.h>
 #import <unistd.h>
 #import <errno.h>
 #import <fcntl.h>
+
+// Определяем константы утуна вручную, так как они приватные
+#ifndef UTUN_CONTROL_NAME
+#define UTUN_CONTROL_NAME "com.apple.net.utun_control"
+#endif
+#ifndef UTUN_OPT_IFNAME
+#define UTUN_OPT_IFNAME 2
+#endif
 
 #define kRouteDstDefault  @"0.0.0.0"
 #define kRollbackMarker   @"/var/run/navigatiod.active"
@@ -23,7 +29,7 @@
 @property (nonatomic, assign) BOOL defaultRouteReplaced;
 @property (nonatomic, strong) NSMutableArray *savedDNSServers;
 @property (nonatomic, strong) NSString *savedSearchDomains;
-@property (nonatomic, strong) NSString *savedDefaultGateway; // Исправлено: добавлено свойство
+@property (nonatomic, strong) NSString *savedDefaultGateway;
 @property (nonatomic, assign) uint32_t savedDefaultMetric;
 @property (nonatomic, strong) dispatch_queue_t ioQueue;
 @end
@@ -88,7 +94,6 @@
             return NO;
         }
 
-        // Исправлено: использование стандартного метода создания файла
         [[NSFileManager defaultManager] createFileAtPath:kRollbackMarker contents:[NSData data] attributes:nil];
         _active = YES;
         return YES;
@@ -150,7 +155,7 @@
     struct ctl_info ci = {0};
     strlcpy(ci.ctl_name, UTUN_CONTROL_NAME, sizeof(ci.ctl_name));
     if (ioctl(fd, CTLIOCGINFO, &ci) != 0) { 
-        close(fd); // Исправлено: закрываем fd при ошибке
+        close(fd); 
         if (error) *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:nil]; 
         return nil; 
     }
@@ -271,10 +276,10 @@
     NSError *rErr = nil;
     NSString *content = [NSString stringWithContentsOfFile:@"/etc/resolv.conf" encoding:NSUTF8StringEncoding error:&rErr];
     if (!rErr && content) {
-        _savedDNSServers = [NSMutableArray array]; // Исправлено: инициализация mutable массива
+        _savedDNSServers = [NSMutableArray array]; 
         for (NSString *line in [content componentsSeparatedByString:@"\n"]) {
             if ([line hasPrefix:@"nameserver "]) {
-                [_savedDNSServers addObject:[line stringByReplacingOccurrencesOfString:@"nameserver " withString:@""]]; // Исправлено: addObject
+                [_savedDNSServers addObject:[line stringByReplacingOccurrencesOfString:@"nameserver " withString:@""]];
             }
         }
     }
