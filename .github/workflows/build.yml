@@ -21,12 +21,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install toolchain deps
+      - name: Install system deps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
-            git make curl xz-utils ldid libplist-utils unzip \
+            git make curl xz-utils libplist-utils unzip \
             clang fakeroot dpkg-dev perl >/dev/null
+
+      - name: Install ldid and deps
+        uses: dhinakg/procursus-action@main
+        with:
+          packages: ldid findutils sed coreutils make
 
       - name: Bootstrap Theos
         run: |
