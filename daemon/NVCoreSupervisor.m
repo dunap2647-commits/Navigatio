@@ -78,14 +78,21 @@ extern char **environ;
         return NO;
     }
 
-    // === ЗАМЕНА NSTask НА posix_spawn ===
     const char *exe = _corePath.UTF8String;
     const char *arg1 = (_coreType == NVCoreTypeSingBox) ? "run" : "-config";
     const char *arg2 = _configPath.UTF8String;
     char *argv[] = { (char *)exe, (char *)arg1, (char *)arg2, NULL };
 
+    posix_spawn_file_actions_t file_actions;
+    posix_spawn_file_actions_init(&file_actions);
+    // Перенаправляем stdout/stderr в файлы
+    posix_spawn_file_actions_addopen(&file_actions, STDOUT_FILENO, "/var/log/navigatio/core.out.log", O_WRONLY|O_CREAT|O_APPEND, 0644);
+    posix_spawn_file_actions_addopen(&file_actions, STDERR_FILENO, "/var/log/navigatio/core.err.log", O_WRONLY|O_CREAT|O_APPEND, 0644);
+
     pid_t pid = 0;
-    int rc = posix_spawn(&pid, exe, NULL, NULL, argv, environ);
+    int rc = posix_spawn(&pid, exe, &file_actions, NULL, argv, environ);
+    posix_spawn_file_actions_destroy(&file_actions);
+
     if (rc != 0) {
         _lastError = [NSString stringWithFormat:@"posix_spawn failed: %s", strerror(rc)];
         if (error) *error = [NSError errorWithDomain:@"NVCoreSupervisor" code:-4 userInfo:@{NSLocalizedDescriptionKey: _lastError}];
@@ -94,11 +101,6 @@ extern char **environ;
 
     _corePID = pid;
 
-    // Перенаправляем stdout/stderr ядра в файлы (опционально, можно опустить)
-    // posix_spawn не позволяет напрямую перенаправить вывод без file_actions,
-    // но для демона это не критично.
-
-    // Watchdog: периодически проверяем, жив ли процесс
     _watchdogSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, _ioQueue);
     dispatch_source_set_timer(_watchdogSource, dispatch_walltime(NULL, 0), 5ull * NSEC_PER_SEC, 0);
     __weak typeof(self) weakSelf = self;
@@ -113,7 +115,7 @@ extern char **environ;
     });
     dispatch_resume(_watchdogSource);
 
-    usleep(300 * 1000); // даём ядру время подняться
+    usleep(300 * 1000);
 
     if (error) *error = nil;
     _lastError = nil;
@@ -135,7 +137,7 @@ extern char **environ;
             }
             if (waitpid(_corePID, NULL, WNOHANG) != _corePID) {
                 kill(_corePID, SIGKILL);
-                waitpid(_corePID, NULL, 0); // подбираем зомби
+                waitpid(_corePID, NULL, 0);
             }
         }
         _corePID = 0;
@@ -156,10 +158,67 @@ extern char **environ;
     _running = NO;
 }
 
-// tcpPingHost остаётся без изменений (использует POSIX-сокеты)
 - (NSNumber *)tcpPingHost:(NSString *)host port:(uint16_t)port error:(NSError **)error {
-    // ... (код без изменений, он не использовал NSTask)
-    // Скопируйте сюда старую реализацию tcpPingHost
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) { if (error) *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:nil]; return nil; }
+
+    int on = 1;
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
+
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    if (inet_pton(AF_INET, host.UTF8String, &addr.sin_addr) != 1) {
+        struct addrinfo hints = {0}, *res = NULL;
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        if (getaddrinfo(host.UTF8String, NULL, &hints, &res) != 0 || !res) {
+            close(fd);
+            if (error) *error = [NSError errorWithDomain:@"NVCoreSupervisor" code:-5 userInfo:@{NSLocalizedDescriptionKey: @"DNS resolution failed"}];
+            return nil;
+        }
+        addr.sin_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr;
+        freeaddrinfo(res);
+    }
+
+    int flags = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+    struct timeval start;
+    gettimeofday(&start, NULL);
+
+    int rc = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
+    if (rc < 0 && errno != EINPROGRESS) {
+        close(fd);
+        if (error) *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:nil];
+        return nil;
+    }
+
+    fd_set wfds;
+    FD_ZERO(&wfds);
+    FD_SET(fd, &wfds);
+    struct timeval timeout = { .tv_sec = 3, .tv_usec = 0 };
+    rc = select(fd + 1, NULL, &wfds, NULL, &timeout);
+    if (rc <= 0) {
+        close(fd);
+        if (error) *error = [NSError errorWithDomain:@"NVCoreSupervisor" code:-6 userInfo:@{NSLocalizedDescriptionKey: @"TCP connect timeout"}];
+        return nil;
+    }
+
+    int so_error = 0;
+    socklen_t len = sizeof(so_error);
+    getsockopt(fd, SOL_SOCKET, SO_ERROR, &so_error, &len);
+    close(fd);
+
+    if (so_error != 0) {
+        if (error) *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:so_error userInfo:nil];
+        return nil;
+    }
+
+    struct timeval end;
+    gettimeofday(&end, NULL);
+    long ms = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) / 1000;
+    return @(ms);
 }
 
 - (NSDictionary *)status {
