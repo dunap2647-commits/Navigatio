@@ -7,6 +7,7 @@
 #import <Foundation/Foundation.h>
 #import <sys/ioctl.h>
 #import <sys/socket.h>
+#import <sys/sockio.h>
 #import <net/if.h>
 #import <netinet/in.h>
 #import <unistd.h>
@@ -17,7 +18,7 @@
 
 extern char **environ;
 
-// === Определения, отсутствующие в iOS SDK ===
+// === Определения для utun ===
 #ifndef PF_SYSTEM
 #define PF_SYSTEM 32
 #endif
@@ -194,38 +195,22 @@ struct sockaddr_ctl {
         return nil; 
     }
 
-    int unit = 0;
-    if (getsockopt(fd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME, NULL, &(socklen_t){0}) == 0) {
-        /* unit already assigned by kernel */
-    }
-
-    struct ifreq ifr = {0};
-    ifr.ifr_data = (caddr_t)&unit;
-    if (ioctl(fd, SIOCGIFNAME, &ifr) == 0) {
+    // Правильное получение имени интерфейса через getsockopt
+    char name[IFNAMSIZ] = {0};
+    socklen_t len = sizeof(name);
+    if (getsockopt(fd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME, name, &len) == 0) {
         _tunFD = fd;
-        return [NSString stringWithUTF8String:ifr.ifr_name];
+        return [NSString stringWithUTF8String:name];
     }
 
-    for (int u = 0; u < 32; u++) {
-        char name[16];
-        snprintf(name, sizeof(name), "utun%d", u);
-        int testFD = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL);
-        if (testFD < 0) continue;
-        if (ioctl(testFD, SIOCGIFNAME, &(struct ifreq){.ifr_name = {0}}) == 0 && strncmp(name, "utun", 4) == 0) {
-            _tunFD = testFD;
-            close(fd);
-            return [NSString stringWithUTF8String:name];
-        }
-        close(testFD);
-    }
-
-    _tunFD = fd;
-    return [NSString stringWithFormat:@"utun%d", unit];
+    close(fd);
+    if (error) *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:nil]; 
+    return nil;
 }
 
 - (BOOL)configureInterface:(NSString *)ifname error:(NSError **)error {
-    char cmd[512];
-    snprintf(cmd, sizeof(cmd), "ifconfig %s 10.255.0.1 10.255.0.2 up", ifname.UTF8String);
+    // Исправлено: передача NSString вместо char[]
+    NSString *cmd = [NSString stringWithFormat:@"ifconfig %@ 10.255.0.1 10.255.0.2 up", ifname];
     return [self runShell:cmd error:error];
 }
 
@@ -268,9 +253,6 @@ struct sockaddr_ctl {
 
 - (BOOL)replaceDefaultRoute:(NSError **)error {
     NSString *result = nil;
-    const char *sh = "/bin/sh";
-    char *argv[] = { (char *)sh, "-c", "/usr/sbin/route -n get default 2>&1", NULL };
-    
     FILE *fp = popen("/usr/sbin/route -n get default 2>&1", "r");
     if (fp) {
         char buf[512];
@@ -353,7 +335,7 @@ struct sockaddr_ctl {
 }
 
 - (BOOL)deleteInterface:(NSString *)ifname {
-    return [self runShell:[NSString stringWithFormat:@"ifconfig %s down", ifname.UTF8String] error:nil];
+    return [self runShell:[NSString stringWithFormat:@"ifconfig %@ down", ifname] error:nil];
 }
 
 - (BOOL)runShell:(NSString *)command error:(NSError **)error {
