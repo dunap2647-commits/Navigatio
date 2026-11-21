@@ -1,0 +1,9 @@
+Package: com.navigatio.proxy
+Name: Navigatio
+Version: 0.1.0
+Architecture: iphoneos-arm
+Description: Lightweight anti-DPI proxy client & daemon for iOS 12
+Maintainer: Navigatio Dev
+Author: Navigatio Dev
+Section: Networking
+Depends: firmware (>= 12.0)

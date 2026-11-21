@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    launchctl unload /Library/LaunchDaemons/com.navigatio.daemon.plist 2>/dev/null || true
+    rm -f /var/run/navigatiod.sock /var/run/navigatiod.active
+fi
+exit 0

@@ -1,0 +1,9 @@
+#!/bin/sh
+mkdir -p /var/log/navigatio
+chown root:wheel /usr/libexec/navigatiod
+chmod 755 /usr/libexec/navigatiod
+chmod 644 /Library/LaunchDaemons/com.navigatio.daemon.plist
+chown root:wheel /Library/LaunchDaemons/com.navigatio.daemon.plist
+launchctl unload /Library/LaunchDaemons/com.navigatio.daemon.plist 2>/dev/null || true
+launchctl load -w /Library/LaunchDaemons/com.navigatio.daemon.plist
+exit 0

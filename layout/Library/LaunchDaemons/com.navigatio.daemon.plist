@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.navigatio.daemon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/libexec/navigatiod</string>
+        <string>--socket</string><string>/var/run/navigatiod.sock</string>
+    </array>
+    <key>RunAtLoad</key><true/>
+    <key>KeepAlive</key>
+    <dict><key>SuccessfulExit</key><false/></dict>
+    <key>ThrottleInterval</key><integer>5</integer>
+    <key>ProcessType</key><string>Interactive</string>
+    <key>StandardOutPath</key><string>/var/log/navigatio/daemon.out.log</string>
+    <key>StandardErrorPath</key><string>/var/log/navigatio/daemon.err.log</string>
+</dict>
+</plist>
