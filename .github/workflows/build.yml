@@ -80,3 +80,4 @@ jobs:
           path: |
             .theos/_/DEBIAN
             **/*.log
+          if-no-files-found: ignore
