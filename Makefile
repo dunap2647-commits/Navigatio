@@ -7,7 +7,7 @@ INSTALL_TARGET_PROCESSES = navigatiod
 navigatiod_CODESIGN_FLAGS = -S$(THEOS_PROJECT_DIR)/entitlements.plist
 
 # app временно закомментирован, пока не готовы файлы интерфейса
-SUBPROJECTS += common daemon
+SUBPROJECTS += common daemon app
 
 include $(THEOS)/makefiles/common.mk
 include $(THEOS_MAKE_PATH)/aggregate.mk
