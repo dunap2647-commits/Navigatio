@@ -40,20 +40,33 @@ jobs:
 
       - name: Bootstrap Theos
         run: |
+          # 1. Клонируем Theos, если его еще нет
           if [ ! -d "$THEOS/makefiles" ]; then
             sudo git clone --recursive --depth 1 \
               https://github.com/theos/theos.git "$THEOS"
             sudo chown -R "$USER:$USER" "$THEOS"
           fi
 
+          # 2. Загружаем SDK напрямую из официального репозитория
           mkdir -p "$THEOS/sdks"
           if [ -z "$(ls -A "$THEOS/sdks" 2>/dev/null)" ]; then
-            curl -fL -o /tmp/sdks.tar.gz \
-              https://github.com/theos/sdks/archive/refs/heads/master.tar.gz
-            tar -xzf /tmp/sdks.tar.gz -C /tmp
-            cp -r /tmp/sdks-master/*.sdk "$THEOS/sdks/" 2>/dev/null || true
+            echo "Downloading SDKs..."
+            # Клонируем репозиторий с SDK во временную папку
+            git clone --depth 1 https://github.com/theos/sdks.git /tmp/theos-sdks
+            
+            # Копируем нужный SDK (например, iPhoneOS12.4.sdk) в Theos
+            # Вы можете заменить версию на ту, что необходима для вашего проекта
+            cp -r /tmp/theos-sdks/iPhoneOS12.4.sdk "$THEOS/sdks/"
+            
+            # Проверяем, что SDK скопировался
+            if [ ! -d "$THEOS/sdks/iPhoneOS12.4.sdk" ]; then
+              echo "::error::Failed to copy iPhoneOS12.4.sdk to $THEOS/sdks"
+              exit 1
+            fi
+            echo "SDK successfully installed."
           fi
 
+          # 3. Устанавливаем dm.pl
           sudo curl -fL -o /usr/local/bin/dm.pl \
             https://raw.githubusercontent.com/theos/theos/master/bin/dm.pl
           sudo chmod +x /usr/local/bin/dm.pl
@@ -63,7 +76,9 @@ jobs:
       - name: Verify toolchain
         run: |
           echo "THEOS=$THEOS"
+          echo "--- SDKs ---"
           ls "$THEOS/sdks/" || true
+          echo "--- Tools ---"
           which clang ldid dpkg-deb || true
 
       - name: Lint plists
@@ -71,7 +86,7 @@ jobs:
           for p in daemon/entitlements.plist app/entitlements.plist app/Info.plist \
                    layout/Library/LaunchDaemons/com.navigatio.daemon.plist; do
             if [ ! -f "$p" ]; then
-              echo "::warning::Файл $p не найден — пропускаем"
+              echo "::warning::File $p not found - skipping"
               continue
             fi
             echo "-> $p"
