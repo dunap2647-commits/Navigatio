@@ -15,6 +15,8 @@
 #import <signal.h>
 #import <errno.h>
 #import <spawn.h>
+#import <netdb.h>       // Исправлено: добавлено для struct addrinfo
+#import <sys/time.h>    // Исправлено: добавлено для gettimeofday
 
 extern char **environ;
 
@@ -85,7 +87,6 @@ extern char **environ;
 
     posix_spawn_file_actions_t file_actions;
     posix_spawn_file_actions_init(&file_actions);
-    // Перенаправляем stdout/stderr в файлы
     posix_spawn_file_actions_addopen(&file_actions, STDOUT_FILENO, "/var/log/navigatio/core.out.log", O_WRONLY|O_CREAT|O_APPEND, 0644);
     posix_spawn_file_actions_addopen(&file_actions, STDERR_FILENO, "/var/log/navigatio/core.err.log", O_WRONLY|O_CREAT|O_APPEND, 0644);
 
