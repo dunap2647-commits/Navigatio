@@ -13,7 +13,7 @@ public final class NVIPCClient {
 public static let shared = NVIPCClient()
 private let queue = DispatchQueue(label: "com.navigatio.ipc.client")
 private var nextID: UInt64 = 1
-private let socketPath = NIPC_SOCKET_PATH
+private let socketPath = "/var/run/navigatiod.sock"
 private init() {}
 public func call(_ method: String,
 params: [String: Any] = [:],
