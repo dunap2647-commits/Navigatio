@@ -3,6 +3,7 @@
 #import <sys/un.h>
 #import <sys/stat.h>
 #import <unistd.h>
+#import <fcntl.h>
 #import "NIPCFrame.h"
 #import "NIPCMessage.h"
 #import "NVCoreSupervisor.h"
@@ -31,8 +32,12 @@
     mode_t oldMask = umask(0077);
     if (stat(path.fileSystemRepresentation, &st) == 0) unlink(path.fileSystemRepresentation);
     
-    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    // Убрали SOCK_CLOEXEC (его нет в iOS)
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) { umask(oldMask); if (error) *error = [self posixError]; return NO; }
+    
+    // Устанавливаем флаг закрытия сокета при exec через fcntl
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
     
     struct sockaddr_un addr = {0};
     addr.sun_family = AF_UNIX;
@@ -109,7 +114,6 @@
         if (![_supervisor startWithConfig:config coreType:type error:&err]) {
             return NIPCResponseJSON(mid, NO, nil, err.localizedDescription ?: @"core start failed", NIPC_ERROR_INTERNAL);
         }
-        // Исправлено: убран аргумент serverAddress
         if (![_routeManager bringUpWithCoreInboundPort:socksPort
                                         tun2socksPath:@"/usr/local/lib/navigatio/bin/tun2socks"
                                                error:&err]) {
