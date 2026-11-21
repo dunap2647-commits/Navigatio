@@ -49,17 +49,21 @@ guard let encoded = try? JSONSerialization.data(withJSONObject: payload, options
 nipc_send_frame(fd, (encoded as NSData).bytes, encoded.count) == 0 else {
 self.deliver(.failure(NIPCError.protocolFailure("Не удалось отправить запрос демону")), completion)
 return
-}
-let cap = Int(NIPC_MAX_FRAME) + 1
-let buffer = UnsafeMutablePointer.allocate(capacity: cap)
-defer { buffer.deallocate() }
-var received: Int = 0
-let recvResult = nipc_recv_frame(fd, buffer, cap, &received)
-guard recvResult == 0 else {
-self.deliver(.failure(NIPCError.protocolFailure("Демон закрыл соединение до ответа")), completion)
-return
-}
-let data = Data(bytes: buffer, count: received)
+        let cap = Int(NIPC_MAX_FRAME) + 1
+        
+        // Выделяем память
+        let buffer = UnsafeMutablePointer<CChar>.allocate(capacity: cap)
+        defer { buffer.deallocate() } // Освобождение памяти
+        
+        var received: size_t = 0
+        let recvResult = nipc_recv_frame(fd, buffer, cap, &received)
+        
+        guard recvResult == 0 else {
+            self.deliver(.failure(NIPCError.protocolFailure("Демон закрыл соединение до ответа")), completion)
+            return
+        }
+        
+        let data = Data(bytes: buffer, count: received)
 guard let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
 self.deliver(.failure(NIPCError.protocolFailure("Некорректный ответ демона")), completion)
 return
