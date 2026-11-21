@@ -32,12 +32,11 @@ jobs:
         with:
           tag: v2.1.5-procursus7
 
-      # Этот шаг заменяет ручную настройку Theos и SDK
       - name: Setup Theos
         uses: Randomblock1/theos-action@v1
         with:
-          theos-dir: '/opt/theos'  # Указываем ту же директорию для совместимости
-          theos-sdks: 'https://github.com/theos/sdks' # Репозиторий с SDK
+          theos-dir: '/opt/theos'
+          theos-sdks: 'https://github.com/theos/sdks'
 
       - name: Verify toolchain
         run: |
@@ -59,9 +58,16 @@ jobs:
             python3 -c "import plistlib, sys; plistlib.load(open(sys.argv[1], 'rb')); print('ok')" "$p"
           done
 
+      # НОВЫЙ ШАГ: Исправляем права на скрипты DEBIAN
+      - name: Fix maintainer script permissions
+        run: |
+          if [ -d "layout/DEBIAN" ]; then
+            chmod +x layout/DEBIAN/* || true
+            echo "Permissions fixed for layout/DEBIAN"
+          fi
+
       - name: Build
         run: |
-          # Устанавливаем THEOS для шага сборки
           export THEOS=/opt/theos
           make clean >/dev/null 2>&1 || true
           make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=
