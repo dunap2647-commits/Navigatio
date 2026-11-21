@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      THEOS: /opt/theos
       TARGET: iphone:clang:latest:12.0
       ARCHS: arm64
 
@@ -33,51 +32,18 @@ jobs:
         with:
           tag: v2.1.5-procursus7
 
-      - name: Verify ldid
-        run: |
-          which ldid
-          ldid -v || true
-
-      - name: Bootstrap Theos
-        run: |
-          # 1. Клонируем Theos, если его еще нет
-          if [ ! -d "$THEOS/makefiles" ]; then
-            sudo git clone --recursive --depth 1 \
-              https://github.com/theos/theos.git "$THEOS"
-            sudo chown -R "$USER:$USER" "$THEOS"
-          fi
-
-          # 2. Загружаем SDK напрямую из официального репозитория
-          mkdir -p "$THEOS/sdks"
-          if [ -z "$(ls -A "$THEOS/sdks" 2>/dev/null)" ]; then
-            echo "Downloading SDKs..."
-            # Клонируем репозиторий с SDK во временную папку
-            git clone --depth 1 https://github.com/theos/sdks.git /tmp/theos-sdks
-            
-            # Копируем нужный SDK (например, iPhoneOS12.4.sdk) в Theos
-            # Вы можете заменить версию на ту, что необходима для вашего проекта
-            cp -r /tmp/theos-sdks/iPhoneOS12.4.sdk "$THEOS/sdks/"
-            
-            # Проверяем, что SDK скопировался
-            if [ ! -d "$THEOS/sdks/iPhoneOS12.4.sdk" ]; then
-              echo "::error::Failed to copy iPhoneOS12.4.sdk to $THEOS/sdks"
-              exit 1
-            fi
-            echo "SDK successfully installed."
-          fi
-
-          # 3. Устанавливаем dm.pl
-          sudo curl -fL -o /usr/local/bin/dm.pl \
-            https://raw.githubusercontent.com/theos/theos/master/bin/dm.pl
-          sudo chmod +x /usr/local/bin/dm.pl
-
-          chmod +x "$THEOS/bin/"* 2>/dev/null || true
+      # Этот шаг заменяет ручную настройку Theos и SDK
+      - name: Setup Theos
+        uses: Randomblock1/theos-action@v1
+        with:
+          theos-dir: '/opt/theos'  # Указываем ту же директорию для совместимости
+          theos-sdks: 'https://github.com/theos/sdks' # Репозиторий с SDK
 
       - name: Verify toolchain
         run: |
-          echo "THEOS=$THEOS"
+          echo "THEOS=/opt/theos"
           echo "--- SDKs ---"
-          ls "$THEOS/sdks/" || true
+          ls /opt/theos/sdks/ || true
           echo "--- Tools ---"
           which clang ldid dpkg-deb || true
 
@@ -95,6 +61,8 @@ jobs:
 
       - name: Build
         run: |
+          # Устанавливаем THEOS для шага сборки
+          export THEOS=/opt/theos
           make clean >/dev/null 2>&1 || true
           make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=
 
