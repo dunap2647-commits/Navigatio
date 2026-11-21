@@ -9,7 +9,10 @@ Navigatio_SWIFTFLAGS = -ISources/IPC
 # Говорим компилятору Swift использовать наш мост для C-кода
 Navigatio_SWIFT_BRIDGING_HEADER = Bridging-Header.h
 
-# Подпись (если вы создали app/entitlements.plist)
+# Подпись
 Navigatio_CODESIGN_FLAGS = -Sentitlements.plist
+
+# ВОТ ЭТА СТРОКА: подключаем C-библиотеку с функциями nipc_*
+Navigatio_LIBRARIES = navigatioipc
 
 include $(THEOS_MAKE_PATH)/application.mk
