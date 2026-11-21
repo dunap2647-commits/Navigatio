@@ -1,0 +1,88 @@
+name: Build
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  theos:
+    name: Build .deb (Theos, iOS 12 arm64)
+    runs-on: ubuntu-latest
+    container:
+      image: theos/theos:latest
+      options: --user root
+
+    env:
+      THEOS: /opt/theos
+      TARGET: iphone:clang:latest:12.0
+      ARCHS: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install toolchain deps
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq git make curl xz-utils ldid libplist-utils unzip >/dev/null
+
+      - name: Bootstrap Theos
+        run: |
+          if [ ! -d "$THEOS/makefiles" ]; then
+            git clone --recursive --depth 1 https://github.com/theos/theos.git "$THEOS"
+            curl -L -o /tmp/sdks.tar.xz \
+              https://github.com/theos/sdks/releases/latest/download/iPhoneOS12.4.sdk.tar.xz
+            mkdir -p "$THEOS/sdks"
+            tar -xJf /tmp/sdks.tar.xz -C "$THEOS/sdks"
+            git clone --depth 1 https://github.com/theos/libhooker.git /tmp/libhooker
+            make -C /tmp/libhooker -j"$(nproc)"
+            make -C /tmp/libhooker install
+          fi
+          "$THEOS/bin/dm.pl" --help >/dev/null 2>&1 || \
+            (curl -L -o /usr/local/bin/dm.pl https://raw.githubusercontent.com/theos/dm.pl/master/dm.pl && chmod +x /usr/local/bin/dm.pl)
+          chmod +x "$THEOS/bin/"* 2>/dev/null || true
+
+      - name: Verify toolchain
+        run: |
+          echo "THEOS=$THEOS"
+          ls "$THEOS/sdks/"
+          which clang ldid dpkg-deb
+
+      - name: Lint plists
+        run: |
+          for p in daemon/entitlements.plist app/entitlements.plist app/Info.plist \
+                   layout/Library/LaunchDaemons/com.navigatio.daemon.plist; do
+            echo "-> $p"
+            python3 - "$p" <<'PY'
+import plistlib, sys
+with open(sys.argv[1], 'rb') as f:
+    plistlib.load(f)
+print("ok")
+PY
+          done
+
+      - name: Build
+        run: |
+          make clean >/dev/null 2>&1 || true
+          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=
+
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: navigatio-deb
+          path: packages/*.deb
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            .theos/_/DEBIAN
+            **/*.log
+          if-no-files-found: ignore
