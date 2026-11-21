@@ -28,10 +28,15 @@ jobs:
             git make curl xz-utils libplist-utils unzip \
             clang fakeroot dpkg-dev perl >/dev/null
 
-      - name: Install ldid and deps
-        uses: dhinakg/procursus-action@main
+      - name: Install ldid
+        uses: MOZGIII/install-ldid-action@v1
         with:
-          packages: ldid findutils sed coreutils make
+          tag: v2.1.5-procursus7
+
+      - name: Verify ldid
+        run: |
+          which ldid
+          ldid -v || true
 
       - name: Bootstrap Theos
         run: |
