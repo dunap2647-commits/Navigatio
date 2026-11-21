@@ -2,17 +2,23 @@ include $(THEOS)/makefiles/common.mk
 
 APPLICATION_NAME = Navigatio
 
-Navigatio_FILES = $(shell find Sources -name '*.swift')
+# Добавляем Swift-файлы И напрямую C/Obj-C файлы из папки common
+Navigatio_FILES = $(shell find Sources -name '*.swift') \
+                  ../common/NIPCFrame.c \
+                  ../common/NIPCMessage.m
+
 Navigatio_FRAMEWORKS = UIKit Foundation
+
+# Флаги для компиляции Objective-C/C частей
+Navigatio_CFLAGS = -fobjc-arc -I../common
+
+# Флаги для Swift
 Navigatio_SWIFTFLAGS = -ISources/IPC
 
-# Говорим компилятору Swift использовать наш мост для C-кода
+# Мост для Swift
 Navigatio_SWIFT_BRIDGING_HEADER = Bridging-Header.h
 
 # Подпись
 Navigatio_CODESIGN_FLAGS = -Sentitlements.plist
-
-# ВОТ ЭТА СТРОКА: подключаем C-библиотеку с функциями nipc_*
-Navigatio_LIBRARIES = navigatioipc
 
 include $(THEOS_MAKE_PATH)/application.mk
