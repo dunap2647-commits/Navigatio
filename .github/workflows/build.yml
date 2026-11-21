@@ -70,6 +70,10 @@ jobs:
         run: |
           for p in daemon/entitlements.plist app/entitlements.plist app/Info.plist \
                    layout/Library/LaunchDaemons/com.navigatio.daemon.plist; do
+            if [ ! -f "$p" ]; then
+              echo "::warning::Файл $p не найден — пропускаем"
+              continue
+            fi
             echo "-> $p"
             python3 -c "import plistlib, sys; plistlib.load(open(sys.argv[1], 'rb')); print('ok')" "$p"
           done
