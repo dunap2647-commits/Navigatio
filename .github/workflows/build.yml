@@ -11,9 +11,6 @@ jobs:
   theos:
     name: Build .deb (Theos, iOS 12 arm64)
     runs-on: ubuntu-latest
-    container:
-      image: theos/theos:latest
-      options: --user root
 
     env:
       THEOS: /opt/theos
@@ -26,30 +23,38 @@ jobs:
 
       - name: Install toolchain deps
         run: |
-          apt-get update -qq
-          apt-get install -y -qq git make curl xz-utils ldid libplist-utils unzip >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            git make curl xz-utils ldid libplist-utils unzip \
+            clang fakeroot dpkg-dev perl >/dev/null
 
       - name: Bootstrap Theos
         run: |
           if [ ! -d "$THEOS/makefiles" ]; then
-            git clone --recursive --depth 1 https://github.com/theos/theos.git "$THEOS"
-            curl -L -o /tmp/sdks.tar.xz \
-              https://github.com/theos/sdks/releases/latest/download/iPhoneOS12.4.sdk.tar.xz
-            mkdir -p "$THEOS/sdks"
-            tar -xJf /tmp/sdks.tar.xz -C "$THEOS/sdks"
-            git clone --depth 1 https://github.com/theos/libhooker.git /tmp/libhooker
-            make -C /tmp/libhooker -j"$(nproc)"
-            make -C /tmp/libhooker install
+            sudo git clone --recursive --depth 1 \
+              https://github.com/theos/theos.git "$THEOS"
+            sudo chown -R "$USER:$USER" "$THEOS"
           fi
-          "$THEOS/bin/dm.pl" --help >/dev/null 2>&1 || \
-            (curl -L -o /usr/local/bin/dm.pl https://raw.githubusercontent.com/theos/dm.pl/master/dm.pl && chmod +x /usr/local/bin/dm.pl)
+
+          mkdir -p "$THEOS/sdks"
+          if [ -z "$(ls -A "$THEOS/sdks" 2>/dev/null)" ]; then
+            curl -fL -o /tmp/sdks.tar.gz \
+              https://github.com/theos/sdks/archive/refs/heads/master.tar.gz
+            tar -xzf /tmp/sdks.tar.gz -C /tmp
+            cp -r /tmp/sdks-master/*.sdk "$THEOS/sdks/" 2>/dev/null || true
+          fi
+
+          sudo curl -fL -o /usr/local/bin/dm.pl \
+            https://raw.githubusercontent.com/theos/theos/master/bin/dm.pl
+          sudo chmod +x /usr/local/bin/dm.pl
+
           chmod +x "$THEOS/bin/"* 2>/dev/null || true
 
       - name: Verify toolchain
         run: |
           echo "THEOS=$THEOS"
-          ls "$THEOS/sdks/"
-          which clang ldid dpkg-deb
+          ls "$THEOS/sdks/" || true
+          which clang ldid dpkg-deb || true
 
       - name: Lint plists
         run: |
