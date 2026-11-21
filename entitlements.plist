@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Отключает песочницу. Жизненно необходимо для вызовов ifconfig, route и работы с сокетами -->
+    <key>com.apple.private.security.no-sandbox</key>
+    <true/>
+    
+    <!-- Позволяет демону работать как системный процесс iOS -->
+    <key>platform-application</key>
+    <true/>
+    
+    <!-- Дает полный доступ к сетевым сокетам (создание utun и т.д.) -->
+    <key>com.apple.private.network.socket.native</key>
+    <true/>
+    
+    <!-- Позволяет демону управлять другими процессами (запускать и убивать sing-box/xray и tun2socks) -->
+    <key>task_for_pid-allow</key>
+    <true/>
+    
+    <!-- Дает доступ к системным портам задач -->
+    <key>com.apple.system-task-ports</key>
+    <true/>
+</dict>
+</plist>
